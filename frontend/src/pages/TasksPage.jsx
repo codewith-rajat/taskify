@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { DataGrid } from "@mui/x-data-grid";
-import { taskAPI, projectAPI } from "../services/api";
+import { taskAPI, projectAPI, projectMembersAPI, userAPI } from "../services/api";
 import { setTasks, setProjects } from "../state/dataSlice";
 import { Plus, Trash2, Edit2, AlertCircle } from "lucide-react";
 import TaskDetailModal from "../components/TaskDetailModal";
@@ -16,6 +16,13 @@ const TasksPage = () => {
   const [editingId, setEditingId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [error, setError] = useState("");
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [allMembers, setAllMembers] = useState({});  // Cache members by projectId
+  const [filters, setFilters] = useState({
+    status: "",
+    priority: "",
+    assignedTo: "",
+  });
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -43,6 +50,19 @@ const TasksPage = () => {
         );
         const results = await Promise.all(taskPromises);
         allTasks = results.flat().filter(Boolean);
+        
+        // Fetch members for all projects
+        const membersMap = {};
+        for (const project of projectsData) {
+          try {
+            const members = await projectMembersAPI.getMembers(project.id);
+            membersMap[project.id] = members || [];
+          } catch (err) {
+            console.error(`Failed to fetch members for project ${project.id}:`, err);
+            membersMap[project.id] = [];
+          }
+        }
+        setAllMembers(membersMap);
       }
       dispatch(setTasks(allTasks));
     } catch (err) {
@@ -54,10 +74,44 @@ const TasksPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "projectId" ? parseInt(value) : value,
-    }));
+    setFormData((prev) => {
+      let updatedValue = value;
+      
+      if (name === "projectId") {
+        updatedValue = parseInt(value);
+      } else if (name === "assignedTo") {
+        updatedValue = value ? parseInt(value) : null;
+      }
+      
+      return {
+        ...prev,
+        [name]: updatedValue,
+      };
+    });
+    
+    // Fetch project members when project is selected
+    if (name === "projectId" && value) {
+      fetchProjectMembers(parseInt(value));
+    }
+  };
+
+  const fetchProjectMembers = async (projectId) => {
+    try {
+      // Check if already cached
+      if (allMembers[projectId]) {
+        setProjectMembers(allMembers[projectId]);
+        return;
+      }
+      const members = await projectMembersAPI.getMembers(projectId);
+      setProjectMembers(members || []);
+      setAllMembers(prev => ({
+        ...prev,
+        [projectId]: members || []
+      }));
+    } catch (err) {
+      console.error("Failed to fetch project members:", err);
+      setProjectMembers([]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -70,10 +124,22 @@ const TasksPage = () => {
     }
 
     try {
+      const submitData = {
+        title: formData.title,
+        description: formData.description,
+        projectId: formData.projectId,
+        status: formData.status,
+        priority: formData.priority,
+        dueDate: formData.dueDate || null,
+        assignedTo: formData.assignedTo || null,
+      };
+
+      console.log("Submitting task data:", submitData);
+
       if (editingId) {
-        await taskAPI.update(editingId, formData);
+        await taskAPI.update(editingId, submitData);
       } else {
-        await taskAPI.create(formData);
+        await taskAPI.create(submitData);
       }
       await fetchData();
       setShowForm(false);
@@ -90,6 +156,15 @@ const TasksPage = () => {
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const getFilteredTasks = () => {
+    return (tasks || []).filter(task => {
+      if (filters.status && task.status !== filters.status) return false;
+      if (filters.priority && task.priority !== filters.priority) return false;
+      if (filters.assignedTo && task.assigned_to !== parseInt(filters.assignedTo)) return false;
+      return true;
+    });
   };
 
   const handleDelete = async (id) => {
@@ -252,6 +327,31 @@ const TasksPage = () => {
               </div>
             </div>
 
+            <div>
+              <label className="mb-2 block text-sm font-medium dark:text-gray-300">
+                Assign To Team Member
+              </label>
+              {projectMembers.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                  No team members in this project. Invite members from Projects page.
+                </p>
+              ) : (
+                <select
+                  name="assignedTo"
+                  value={formData.assignedTo || ""}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Unassigned</option>
+                  {projectMembers.map((member) => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {member.username || `User ${member.user_id}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -274,6 +374,83 @@ const TasksPage = () => {
         </div>
       )}
 
+      <div className="mb-6 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+        <h2 className="mb-4 text-lg font-semibold dark:text-white">Filters</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-medium dark:text-gray-300">
+              Status
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">All Statuses</option>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="In Review">In Review</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium dark:text-gray-300">
+              Priority
+            </label>
+            <select
+              value={filters.priority}
+              onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">All Priorities</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Urgent">Urgent</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium dark:text-gray-300">
+              Assigned To
+            </label>
+            <select
+              value={filters.assignedTo}
+              onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">All Users</option>
+              <option value="">Unassigned</option>
+              {Array.from(new Set(
+                (tasks || []).map(t => t.assigned_to).filter(Boolean)
+              )).map(userId => {
+                // Find user name from all members
+                let userName = `User ${userId}`;
+                for (const projectMembers of Object.values(allMembers)) {
+                  const member = projectMembers.find(m => m.user_id === userId);
+                  if (member) {
+                    userName = member.username;
+                    break;
+                  }
+                }
+                return (
+                  <option key={userId} value={userId}>
+                    {userName}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+        <button
+          onClick={() => setFilters({ status: "", priority: "", assignedTo: "" })}
+          className="mt-4 rounded-lg bg-gray-400 px-4 py-2 text-white hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700"
+        >
+          Reset Filters
+        </button>
+      </div>
+
       <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
         {selectedTask && (
           <TaskDetailModal
@@ -283,26 +460,57 @@ const TasksPage = () => {
         )}
         <div style={{ height: 400, width: "100%" }}>
           <DataGrid
-            rows={tasks || []}
+            rows={getFilteredTasks()}
             columns={[
               { field: "id", headerName: "ID", width: 70 },
               { field: "title", headerName: "Title", width: 200 },
               {
-                field: "projectId",
+                field: "project_id",
                 headerName: "Project",
                 width: 150,
-                valueFormatter: (value) => {
-                  const project = projects.find((p) => p.id === value);
+                renderCell: (params) => {
+                  const project = projects.find((p) => p.id === params.row.project_id);
                   return project ? project.name : "N/A";
                 },
               },
-              { field: "status", headerName: "Status", width: 150 },
-              { field: "priority", headerName: "Priority", width: 120 },
-              { field: "dueDate", headerName: "Due Date", width: 150 },
+              { field: "status", headerName: "Status", width: 120 },
+              { field: "priority", headerName: "Priority", width: 100 },
+              { 
+                field: "due_date", 
+                headerName: "Due Date", 
+                width: 120,
+                renderCell: (params) => {
+                  if (!params.row.due_date) return "N/A";
+                  // Parse date - handle both ISO format and date strings
+                  let dateStr = params.row.due_date;
+                  if (typeof dateStr === 'string') {
+                    // If it has time, extract just the date part
+                    dateStr = dateStr.split('T')[0];
+                  }
+                  const date = new Date(dateStr + 'T00:00:00');
+                  return date.toLocaleDateString('en-US', { 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    year: 'numeric' 
+                  });
+                }
+              },
+              { 
+                field: "assigned_to", 
+                headerName: "Assigned To", 
+                width: 140,
+                renderCell: (params) => {
+                  if (!params.row.assigned_to) return "Unassigned";
+                  // Get members for this task's project
+                  const projectMembersForTask = allMembers[params.row.project_id] || [];
+                  const member = projectMembersForTask.find(m => m.user_id === params.row.assigned_to);
+                  return member ? member.username : `User ${params.row.assigned_to}`;
+                }
+              },
               {
                 field: "actions",
                 headerName: "Actions",
-                width: 150,
+                width: 120,
                 sortable: false,
                 filterable: false,
                 renderCell: (params) => (

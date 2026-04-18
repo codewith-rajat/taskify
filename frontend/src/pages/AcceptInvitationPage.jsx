@@ -1,83 +1,78 @@
-import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { CheckCircle, AlertCircle, Loader } from "lucide-react";
-import { projectMembersAPI } from "../services/api";
-import { setProjects } from "../state/dataSlice";
+import React, { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { projectMembersAPI } from '../services/api';
+import { useDispatch } from 'react-redux';
+import { setProjects } from '../state/dataSlice';
 
 const AcceptInvitationPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(true);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const [projectName, setProjectName] = useState("");
+  const [status, setStatus] = useState('loading');
+  const [message, setMessage] = useState('Processing invitation...');
 
   useEffect(() => {
-    acceptInvitation();
-  }, []);
+    const acceptInvitation = async () => {
+      try {
+        const token = searchParams.get('token');
+        if (!token) {
+          setStatus('error');
+          setMessage('Invalid invitation link');
+          return;
+        }
 
-  const acceptInvitation = async () => {
-    try {
-      const token = searchParams.get("token");
-      if (!token) {
-        setError("Invalid invitation link");
-        setLoading(false);
-        return;
-      }
-
-      const response = await projectMembersAPI.acceptInvitation(token);
-      setProjectName(response.projectName);
-      setSuccess(true);
- 
-      setTimeout(() => {
+        await projectMembersAPI.acceptInvitation(token);
+        setStatus('success');
+        setMessage('Invitation accepted! Redirecting to projects...');
+        
+        // Clear projects cache to force refresh
         dispatch(setProjects([]));
-        navigate("/projects");
-      }, 2000);
-    } catch (err) {
-      setError(err.message || "Failed to accept invitation");
-    } finally {
-      setLoading(false);
-    }
-  };
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          navigate('/projects');
+        }, 2000);
+      } catch (error) {
+        setStatus('error');
+        setMessage(error.message || 'Failed to accept invitation');
+      }
+    };
+
+    acceptInvitation();
+  }, [searchParams, navigate, dispatch]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg dark:bg-gray-800">
-        {loading ? (
-          <div className="flex flex-col items-center gap-4">
-            <Loader className="h-12 w-12 animate-spin text-blue-500" />
-            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-              Processing invitation...
-            </p>
-          </div>
-        ) : success ? (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              ✅ Success!
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              You've been added to the project <strong>{projectName}</strong>
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Redirecting to projects...
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-4 text-center">
-            <AlertCircle className="h-16 w-16 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              ❌ Error
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">{error}</p>
-            <button
-              onClick={() => navigate("/")}
-              className="mt-6 w-full rounded-lg bg-blue-500 py-3 font-semibold text-white hover:bg-blue-600"
-            >
-              Go Home
-            </button>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {status === 'loading' && 'Processing Invitation'}
+            {status === 'success' && '✓ Success!'}
+            {status === 'error' && '✗ Error'}
+          </h1>
+        </div>
+
+        <div className={`rounded-lg p-6 ${
+          status === 'success' 
+            ? 'bg-green-50 dark:bg-green-900/20' 
+            : status === 'error' 
+            ? 'bg-red-50 dark:bg-red-900/20' 
+            : 'bg-blue-50 dark:bg-blue-900/20'
+        }`}>
+          <p className={`text-center ${
+            status === 'success' 
+              ? 'text-green-700 dark:text-green-400' 
+              : status === 'error' 
+              ? 'text-red-700 dark:text-red-400' 
+              : 'text-blue-700 dark:text-blue-400'
+          }`}>
+            {message}
+          </p>
+        </div>
+
+        {status === 'loading' && (
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         )}
       </div>

@@ -150,6 +150,32 @@ async function initializeDatabase() {
       )
     `);
 
+    // Task update requests table for permission-based updates
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS task_update_requests (
+        id SERIAL PRIMARY KEY,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        requested_by INTEGER REFERENCES users(id),
+        request_type VARCHAR(50) NOT NULL,
+        field_name VARCHAR(100) NOT NULL,
+        old_value VARCHAR(255),
+        new_value VARCHAR(255) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        approved_by INTEGER REFERENCES users(id),
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Add task_update_requests column if not exists
+    try {
+      await pool.query(`ALTER TABLE task_update_requests ADD COLUMN reason TEXT`);
+      console.log('✓ Added reason column to task_update_requests');
+    } catch (e) {
+      if (!e.message.includes('already exists')) throw e;
+    }
+
     console.log('✓ Database initialized successfully');
     process.exit(0);
   } catch (error) {

@@ -150,3 +150,22 @@ export const projectMembersAPI = {
       method: "DELETE",
     }),
 };
+
+export const taskUpdateRequestsAPI = {
+  getRequests: (taskId) =>
+    fetchWithAuth(`/task-update-requests/task/${taskId}`),
+  requestUpdate: (taskId, fieldName, newValue, reason) =>
+    fetchWithAuth(`/task-update-requests/request`, {
+      method: "POST",
+      body: JSON.stringify({ taskId, fieldName, newValue, reason }),
+    }),
+  approveRequest: (requestId) =>
+    fetchWithAuth(`/task-update-requests/${requestId}/approve`, {
+      method: "POST",
+    }),
+  rejectRequest: (requestId, reason) =>
+    fetchWithAuth(`/task-update-requests/${requestId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+};

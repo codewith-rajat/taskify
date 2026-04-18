@@ -12,6 +12,7 @@ import commentRoutes from './routes/comments.js';
 import searchRoutes from './routes/search.js';
 import uploadRoutes from './routes/uploads.js';
 import projectMembersRoutes from './routes/projectMembers.js';
+import taskUpdateRequestsRoutes from './routes/taskUpdateRequests.js';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/project-members', projectMembersRoutes);
+app.use('/api/task-update-requests', taskUpdateRequestsRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

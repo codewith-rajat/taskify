@@ -253,8 +253,13 @@ const ProjectsPage = () => {
                 renderCell: (params) => {
                   const value = params.value;
                   if (!value) return "-";
-                  if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                    const [year, month, day] = value.split('-');
+                  let dateStr = value;
+                  // Extract just the date part if it has time
+                  if (typeof dateStr === 'string' && dateStr.includes('T')) {
+                    dateStr = dateStr.split('T')[0];
+                  }
+                  if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const [year, month, day] = dateStr.split('-');
                     return `${month}/${day}/${year}`;
                   }
                   return value;
@@ -267,8 +272,13 @@ const ProjectsPage = () => {
                 renderCell: (params) => {
                   const value = params.value;
                   if (!value) return "-";
-                  if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                    const [year, month, day] = value.split('-');
+                  let dateStr = value;
+                  // Extract just the date part if it has time
+                  if (typeof dateStr === 'string' && dateStr.includes('T')) {
+                    dateStr = dateStr.split('T')[0];
+                  }
+                  if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const [year, month, day] = dateStr.split('-');
                     return `${month}/${day}/${year}`;
                   }
                   return value;

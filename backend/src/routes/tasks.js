@@ -20,12 +20,17 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { title, description, priority, status, projectId, assignedTo, dueDate } = req.body;
+    
+    console.log('Creating task with data:', { title, description, priority, status, projectId, assignedTo, dueDate });
+    
     const result = await pool.query(
       'INSERT INTO tasks (title, description, priority, status, project_id, assigned_to, due_date, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [title, description, priority, status, projectId, assignedTo, dueDate, req.user.id]
+      [title, description, priority || 'Medium', status || 'To Do', projectId, assignedTo || null, dueDate || null, req.user.id]
     );
+    console.log('Task created:', result.rows[0]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error('Error creating task:', error);
     res.status(500).json({ message: error.message });
   }
 });
