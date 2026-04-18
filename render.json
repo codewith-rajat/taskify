@@ -1,7 +1,7 @@
 {
   "name": "taskify-backend",
-  "buildCommand": "cd backend && npm install",
-  "startCommand": "cd backend && npm start",
+  "buildCommand": "npm run build",
+  "startCommand": "npm start",
   "envVars": [
     {
       "key": "DB_USER",

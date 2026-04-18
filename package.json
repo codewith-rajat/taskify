@@ -1,0 +1,14 @@
+{
+  "name": "taskify",
+  "version": "1.0.0",
+  "description": "Project Management Dashboard - Full Stack",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
+    "build": "cd backend && npm install",
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
